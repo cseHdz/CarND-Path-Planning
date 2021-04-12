@@ -7,14 +7,13 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "helpers.h"
 #include "json.hpp"
-#include "spline.h"
-#include <algorithm>   
+#include "spline.h" 
+#include <math.h>
 
 // for convenience
 using nlohmann::json;
 using std::string;
 using std::vector;
-using std::min;
 
 int main() {
   uWS::Hub h;
@@ -57,11 +56,9 @@ int main() {
   int lane = 1;
   
   // Reference Velocity to target
-  double ref_vel = 49.5; // (mph)
-  double MAX_VEL = 49.4;
-  double MAX_ACC = 0.224; // Avoid Jerk
+  double ref_vel = 0.0; // (mph)
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
+  h.onMessage([&ref_vel, &lane, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
                &map_waypoints_dx,&map_waypoints_dy]
               (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                uWS::OpCode opCode) {
@@ -99,12 +96,6 @@ int main() {
           //   of the road.
           auto sensor_fusion = j[1]["sensor_fusion"];
 
-          json msgJson;
-
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
-
-
           // Number of remaining points in the path
           int prev_size = previous_path_x.size();
           
@@ -128,7 +119,7 @@ int main() {
           for ( int i = 0; i < sensor_fusion.size(); i++ ) {
             
             float d = sensor_fusion[i][6];
-            int car_lane = static_cast<int>((d - d%4)/4);
+            int car_lane = floor(d/4);
              
             double vx = sensor_fusion[i][3];
             double vy = sensor_fusion[i][4];
@@ -158,8 +149,14 @@ int main() {
               
             }
           }
+                 
+          double MAX_VEL = 49.4;
+          double MAX_ACC = 0.224; // Avoid Jerk
           
           // Attempt to pass the car
+          // If yes, and no car right, pass right
+          // If yes, and car right, and no car left, pass left
+          // If yes, and car right, and car left, slow down
           if (too_close){
             
             // Always prefer to pass on the left
@@ -174,21 +171,17 @@ int main() {
             }
           } else if (ref_vel < MAX_VEL){
            
-            ref_vel += MAX_ACC;
-            ref_vel = min(ref_vel, MAX_VEL);
+            ref_vel += MAX_ACC;         
+            ref_vel = fmin(ref_vel, MAX_VEL);
           }
             
-         
-            // If yes, and no car right, pass right
-            // If yes, and car right, and no car left, pass left
-            // If yes, and car right, and car left, slow down
           
          /**********************************************************
          	Add new points to the trajectory
          **********************************************************/
                 
           vector<double> ptsx;
-          vector<double> ptsx;
+          vector<double> ptsy;
           
           // Reference state of the car
           double ref_x = car_x;
@@ -285,13 +278,6 @@ int main() {
           // Add as many points as needed to reach 50
           for( int i = 1; i < 50 - prev_size; i++ ) {
             
-//             ref_vel += speed_diff;
-//             if ( ref_vel > MAX_SPEED ) {
-//                ref_vel = MAX_SPEED;
-//             } else if ( ref_vel < MAX_ACC ) {
-//               ref_vel = MAX_ACC;
-//             }
-            
             // Determine the number of points based on distance divided by velocity
             // Note: Velociy has to be converted to km/h
             double N = target_dist/(0.02 * ref_vel / 2.24);
@@ -313,14 +299,16 @@ int main() {
             x_point += ref_x;
             y_point += ref_y;
 
-//             next_x_vals.push_back(x_point);
-//             next_y_vals.push_back(y_point);
+            next_x_vals.push_back(x_point);
+            next_y_vals.push_back(y_point);
           }
           
           /**********************************************************
             Add next (x,y) points to the trajectory
            ***********************************************************/
-
+           
+          json msgJson;
+          
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
 
