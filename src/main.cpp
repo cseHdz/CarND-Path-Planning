@@ -131,8 +131,8 @@ int main() {
             
             double check_s_dist = check_car_s - car_s;
             
-            // Check whethere a nearby vehicle is within 30m the ego vechicle
-            if (fabs(check_s_dist) < 30){
+            // Check whethere a nearby vehicle is within 20m the ego vechicle
+            if (fabs(check_s_dist) < 20){
               
               // There is a car within 30 min in our lane
               if ((car_lane == lane) && check_car_s > car_s){
@@ -228,7 +228,7 @@ int main() {
           
           for (int i = 0; i < n_points; ++i){       
             
-            vector<double> next_wp = getXY(car_s + dist * (i +i), 2 + 4*lane, 
+            vector<double> next_wp = getXY(car_s + dist * (i + 1), 2 + 4*lane, 
                                            map_waypoints_s, map_waypoints_x, map_waypoints_y);
             
             ptsx.push_back(next_wp[0]);

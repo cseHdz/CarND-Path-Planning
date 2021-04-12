@@ -1,13 +1,8 @@
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
-   
-### Simulator.
-You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases/tag/T3_v1.2).  
 
-To run the simulator on Mac/Linux, first make the binary file executable with the following command:
-```shell
-sudo chmod u+x {simulator_file_name}
-```
+[![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
+
 
 ### Goals
 In this project your goal is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. You will be provided the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, note that other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 10 m/s^3.
@@ -17,14 +12,7 @@ Each waypoint in the list contains  [x,y,s,dx,dy] values. x and y are the waypoi
 
 The highway's waypoints loop around so the frenet s value, distance along the road, goes from 0 to 6945.554.
 
-## Basic Build Instructions
-
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./path_planning`.
-
-Here is the data provided from the Simulator to the C++ Program
+Below is the data provided from the Simulator to the C++ Program
 
 #### Main car's localization Data (No Noise)
 
@@ -65,11 +53,6 @@ the path has processed since last time.
 
 2. There will be some latency between the simulator running and the path planner returning a path, with optimized code usually its not very long maybe just 1-3 time steps. During this delay the simulator will continue using points that it was last given, because of this its a good idea to store the last points you have used so you can have a smooth transition. previous_path_x, and previous_path_y can be helpful for this transition since they show the last points given to the simulator controller with the processed points already removed. You would either return a path that extends this previous path or make sure to create a new path that has a smooth transition with this last path.
 
-## Tips
-
-A really helpful resource for doing this project and creating smooth trajectories was using http://kluge.in-chemnitz.de/opensource/spline/, the spline function is in a single hearder file is really easy to use.
-
----
 
 ## Dependencies
 
@@ -90,56 +73,65 @@ A really helpful resource for doing this project and creating smooth trajectorie
     git clone https://github.com/uWebSockets/uWebSockets 
     cd uWebSockets
     git checkout e94b6e1
-    ```
+    ``
+* [Udacity's Simulator](https://github.com/udacity/self-driving-car-sim/releases/tag/T3_v1.2).
 
-## Editor Settings
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+## Basic Build Instructions
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
-
-## Code Style
-
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+1. Clone this repo.
+2. Make a build directory: `mkdir build && cd build`
+3. Compile: `cmake .. && make`
+4. Run it: `./path_planning`.
 
 ## Project Instructions and Rubric
 
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
+## Rubric Points
+The sections below will dicsuss the details of my implementation of each requirement in the [rubric points](https://review.udacity.com/#!/rubrics/1971/view).
+
+## Implementation Details
+All the code for implementation below can be found [on this file](./src/map.cpp).
+
+There are 
+
+### 1. Determine whether vehicles are in the vicinity and attempt to overtake vehicles in current lane.
+
+The input for this section is the data from sensor fusion.
+
+Based on the current speed of vehicle nearbys, we can assess determine:
+- if the are vehicles within too close to the ego vehicle
+- if there is a car blocking our path in the current lane
+- if it's safe to pass on the right
+- if it's safe to pass on the left
+- whether it's unsafe to overtake and we need to decelerate
+
+A. For this implementation, a safe distance was considered to be 20m, which is 2/3 of the trajectory we are planning.
+
+B. To determine best course of action, we first determine the lane through which each vehicle is travelling.
+
+C. Next, we determine if they expected to be closer than the safe distance within 2ms.
+
+D. Then, if there is a vehicle in front of the ego vehicle, we determine if any vehicle is on the right (from B) within the safe distance (from C). If there is none, then it is safe to pass on the right. Otherwise, repeat the process for the left.
+
+E. If both, lanes are blocked decelerate with a factor of 0.224 m/s to avoid jerk.
+
+F. If there are no cars, proceed to accelerate with a factor of 0.224 m/s to avoid jerk.
+
+### 2. Add points to the new trajectory
+
+In order to ensure consistency between updates, we must add the remaining points from the previous trajectory to our new trajectory in a couple steps.
+
+If available, the next two points in the trajectory are leveraged to set the immediate transition. Otherwise, add a hypothetical point tangent to the direction of the vehicle as the first point.
+
+Then, proceed to add a desired number of waypoints to the trajectory. For this implementation, we are adding the waypoints that are within 30, 60, and 90m from the current location of the vehicle.
+
+As this points are likely to be fart apart, we must proceed to interpolate them through the use of a spline. However, to faciliate interpolation, we must first rotate our points around our yaw and shift them to the origin of our vehicle. This allows all tranformations to be performed at an angle of 0 degrees from (0,0).
+
+We proceed to interpolate the points using the spline. For this, we first determine the target distance in y to be travelled for a given distance in x (Set at 30m for this implementation). Then we determine the number of points needed from the spline by dividing the target distance over the distance travelled in 2ms at the current speed (adjusted from the previous step), and converted to m/s.
+
+Then, we add enough points to the trajectory until there are 50 points (combined with those remaing from the previous trajectory). For each point, we split the distance evenly and perform an inverse transformation to align back to global coordinates. 
+
+These points represent then the new trajectory
 
 
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to ensure
-that students don't feel pressured to use one IDE or another.
-
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
-
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
-
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
 
